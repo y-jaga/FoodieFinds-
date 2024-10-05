@@ -1,59 +1,49 @@
 const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
 
-// Connect to SQLite database
-const db = new sqlite3.Database('./FoodieFinds/database.sqlite', (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to the SQLite database.');
+(async () => {
+  try {
+    const db = await open({
+      filename: ':memory:', // Use in-memory database
+      driver: sqlite3.Database,
+    });
+    console.log('Connected to the SQLite in-memory database.');
+
+    // Create tables
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS restaurants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        cuisine TEXT,
+        isVeg TEXT,
+        rating REAL,
+        priceForTwo INTEGER,
+        location TEXT,
+        hasOutdoorSeating TEXT,
+        isLuxury TEXT
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS dishes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        isVeg TEXT,
+        rating REAL,
+        price INTEGER
+      );
+    `);
+
+    // Seed the database
+    await seedDatabase(db);
+
+  } catch (error) {
+    console.error('Error opening database:', error.message);
   }
-});
+})();
 
-db.serialize(() => {
-  db.run(
-    `CREATE TABLE IF NOT EXISTS restaurants (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      cuisine TEXT,
-      isVeg TEXT,
-      rating REAL,
-      priceForTwo INTEGER,
-      location TEXT,
-      hasOutdoorSeating TEXT,
-      isLuxury TEXT
-    )`,
-    (err) => {
-      if (err) {
-        console.error('Error creating table:', err.message);
-      } else {
-        console.log('Restaurants table created or already exists.');
-      }
-    }
-  );
-  db.run(
-    `CREATE TABLE IF NOT EXISTS dishes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      isVeg TEXT,
-      rating REAL,
-      price INTEGER
-    )`,
-    (err) => {
-      if (err) {
-        console.error('Error creating table:', err.message);
-      } else {
-        console.log('Dishes table created or already exists.');
-      }
-    }
-  );
-
-  const stmt = db.prepare(
-    'INSERT INTO restaurants (name, cuisine, isVeg, rating, priceForTwo, location, hasOutdoorSeating, isLuxury) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  const stmt2 = db.prepare(
-    'INSERT INTO dishes (name, isVeg, rating, price) VALUES (?, ?, ?, ?)'
-  );
-
+// Function to seed the database
+async function seedDatabase(db) {
   const restaurants = [
     {
       name: 'Spice Kitchen',
@@ -86,6 +76,7 @@ db.serialize(() => {
       isLuxury: 'false',
     },
   ];
+
   const dishes = [
     {
       name: 'Paneer Butter Masala',
@@ -107,8 +98,16 @@ db.serialize(() => {
     },
   ];
 
+  const insertRestaurant = db.prepare(
+    'INSERT INTO restaurants (name, cuisine, isVeg, rating, priceForTwo, location, hasOutdoorSeating, isLuxury) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  );
+
+  const insertDish = db.prepare(
+    'INSERT INTO dishes (name, isVeg, rating, price) VALUES (?, ?, ?, ?)'
+  );
+
   for (let restaurant of restaurants) {
-    stmt.run(
+    await insertRestaurant.run(
       restaurant.name,
       restaurant.cuisine,
       restaurant.isVeg,
@@ -119,22 +118,13 @@ db.serialize(() => {
       restaurant.isLuxury
     );
   }
+
   for (let dish of dishes) {
-    stmt2.run(dish.name, dish.isVeg, dish.rating, dish.price);
+    await insertDish.run(dish.name, dish.isVeg, dish.rating, dish.price);
   }
 
-  stmt.finalize();
-  stmt2.finalize();
+  insertRestaurant.finalize();
+  insertDish.finalize();
 
-  console.log('Inserted 3 restaurants into the database.');
-  console.log('Inserted 3 dishes into the database.');
-
-  // Close the database connection
-  db.close((err) => {
-    if (err) {
-      console.error('Error closing database:', err.message);
-    } else {
-      console.log('Database connection closed.');
-    }
-  });
-});
+  console.log('Inserted initial data into the in-memory database.');
+}
