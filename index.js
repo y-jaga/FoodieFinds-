@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,11 +11,18 @@ app.use(express.json());
 
 let db;
 
+const dbPath = path.join('/tmp', 'database.sqlite');
+
 (async () => {
-  db = await open({
-    filename: './database.sqlite',
-    driver: sqlite3.Database,
-  });
+  try {
+    db = await open({
+      filename: dbPath, // Set the database path to /tmp
+      driver: sqlite3.Database,
+    });
+    console.log('Connected to the SQLite database.');
+  } catch (error) {
+    console.error('Error opening database:', error.message);
+  }
 })();
 
 //Exercise 1: Get All Restaurants
